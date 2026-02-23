@@ -15,17 +15,17 @@ bun add @segbedji/sveltekit-pgboss
 ```ts
 import { createJobSystem } from '@segbedji/sveltekit-pgboss';
 
-const { getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
+const { send, getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
   connectionString: process.env.DATABASE_URL!,
   queues: {
     'send-email': {
-      handler: async (data) => {
+      handler: async (data: { to: string; subject: string }) => {
         console.log('Sending email to', data.to);
       },
       retryLimit: 3,
     },
     'generate-report': {
-      handler: async (data) => {
+      handler: async (data: { type: string }) => {
         console.log('Generating report', data.type);
       },
       expireInSeconds: 3600,
@@ -35,13 +35,22 @@ const { getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
     { queue: 'generate-report', cron: '0 8 * * 1' }, // every Monday 8 AM
   ],
 });
+
+// Type-safe: queue name and payload are checked at compile time
+await send({ name: 'send-email', data: { to: 'user@example.com', subject: 'Hello' } });
+
+// TS error: 'nope' is not a valid queue name
+await send({ name: 'nope', data: {} });
+
+// TS error: wrong payload shape for 'send-email'
+await send({ name: 'send-email', data: { type: 'weekly' } });
 ```
 
 ## API Reference
 
 ### `createJobSystem(config)`
 
-Returns `{ getBoss, stopBoss, initJobs, dashboard }`.
+Returns `{ send, getBoss, stopBoss, initJobs, dashboard }`.
 
 #### Config
 
@@ -49,7 +58,7 @@ Returns `{ getBoss, stopBoss, initJobs, dashboard }`.
 |---|---|---|---|
 | `connectionString` | `string` | *required* | PostgreSQL connection string |
 | `schema` | `string` | `'pgboss'` | pg-boss schema name |
-| `queues` | `Record<string, QueueConfig>` | *required* | Queue definitions with handlers |
+| `queues` | `Record<string, QueueConfig<T>>` | *required* | Queue definitions with typed handlers |
 | `schedules` | `ScheduleConfig[]` | `[]` | Cron schedules |
 | `cleanOrphans` | `boolean` | `true` | Fail orphaned active jobs on startup |
 | `onError` | `(err: Error) => void` | `console.error` | Error handler |
@@ -68,7 +77,8 @@ Returns `{ getBoss, stopBoss, initJobs, dashboard }`.
 
 | Property | Type | Description |
 |---|---|---|
-| `getBoss` | `() => Promise<PgBoss>` | Get the pg-boss instance (starts it on first call) |
+| `send` | `(opts: { name, data, options? }) => Promise<string \| null>` | Type-safe job sender — queue name and payload are validated at compile time |
+| `getBoss` | `() => Promise<PgBoss>` | Get the raw pg-boss instance (starts it on first call) |
 | `stopBoss` | `() => Promise<void>` | Graceful shutdown |
 | `initJobs` | `() => Promise<void>` | Initialize: clean orphans, create queues, register workers & schedules |
 | `dashboard.getData(limit?)` | `() => Promise<DashboardData>` | Queue stats + recent jobs |
@@ -86,7 +96,7 @@ import { createJobSystem } from '@segbedji/sveltekit-pgboss';
 import { handleSendEmail } from './handlers/send-email.js';
 import { handleGenerateReport } from './handlers/generate-report.js';
 
-const { getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
+const { send, getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
   connectionString: process.env.DATABASE_URL!,
   queues: {
     'send-email': {
@@ -104,7 +114,7 @@ const { getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
   ],
 });
 
-export { getBoss, stopBoss, initJobs, dashboard };
+export { send, getBoss, stopBoss, initJobs, dashboard };
 ```
 
 ### Start workers in `hooks.server.ts`
@@ -126,10 +136,10 @@ Set `ENABLE_WORKER=true` on the process that should run workers. This lets you r
 ### Send jobs from anywhere
 
 ```ts
-import { getBoss } from '$lib/server/jobs';
+import { send } from '$lib/server/jobs';
 
-const boss = await getBoss();
-await boss.send('send-email', { to: 'user@example.com', subject: 'Hello' });
+// Type-safe: TS validates queue name and payload
+await send({ name: 'send-email', data: { to: 'user@example.com', subject: 'Hello' } });
 ```
 
 ### Dashboard remote functions
@@ -245,6 +255,7 @@ All types are exported:
 ```ts
 import type {
   JobSystemConfig,
+  PayloadMap,
   QueueConfig,
   ScheduleConfig,
   QueueStats,
