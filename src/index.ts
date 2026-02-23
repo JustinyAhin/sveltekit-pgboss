@@ -1,9 +1,14 @@
+import type { SendOptions } from "pg-boss";
 import { createBossManager } from "./boss.js";
 import { createInitJobs } from "./init.js";
 import { createDashboard } from "./dashboard.js";
-import type { JobSystemConfig } from "./types.js";
+import type { JobSystemConfig, PayloadMap, QueueConfig } from "./types.js";
 
-const createJobSystem = (config: JobSystemConfig) => {
+const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
+  config: JobSystemConfig<Q>,
+) => {
+  type Payloads = PayloadMap<Q>;
+
   const schema = config.schema ?? "pgboss";
   const onError = config.onError ?? ((err: Error) => console.error("[pg-boss] error:", err));
 
@@ -31,12 +36,22 @@ const createJobSystem = (config: JobSystemConfig) => {
     getBoss,
   });
 
-  return { getBoss, stopBoss, initJobs, dashboard };
+  const send = async <K extends keyof Payloads & string>(opts: {
+    name: K;
+    data: Payloads[K];
+    options?: SendOptions;
+  }): Promise<string | null> => {
+    const boss = await getBoss();
+    return boss.send(opts.name, opts.data as object, opts.options);
+  };
+
+  return { getBoss, stopBoss, initJobs, dashboard, send };
 };
 
 export { createJobSystem };
 export type {
   JobSystemConfig,
+  PayloadMap,
   QueueConfig,
   ScheduleConfig,
   QueueStats,

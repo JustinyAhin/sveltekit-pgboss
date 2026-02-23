@@ -12,13 +12,17 @@ type ScheduleConfig = {
   cron: string;
 };
 
-type JobSystemConfig = {
+type JobSystemConfig<Q extends Record<string, QueueConfig<any>> = Record<string, QueueConfig>> = {
   connectionString: string;
   schema?: string;
-  queues: Record<string, QueueConfig>;
+  queues: Q;
   schedules?: ScheduleConfig[];
   cleanOrphans?: boolean;
   onError?: (err: Error) => void;
+};
+
+type PayloadMap<Q extends Record<string, QueueConfig<any>>> = {
+  [K in keyof Q]: Q[K] extends QueueConfig<infer T> ? T : never;
 };
 
 type QueueStats = {
@@ -61,6 +65,7 @@ export type {
   QueueConfig,
   ScheduleConfig,
   JobSystemConfig,
+  PayloadMap,
   QueueStats,
   JobInfo,
   DashboardData,
