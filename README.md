@@ -81,7 +81,7 @@ Returns `{ getBoss, stopBoss, initJobs, dashboard }`.
 | `stopBoss` | `() => Promise<void>` | Graceful shutdown |
 | `initJobs` | `() => Promise<void>` | Initialize: clean orphans, create queues, register workers & schedules |
 | `dashboard.getData(limit?)` | `() => Promise<DashboardData>` | Queue stats + recent jobs |
-| `dashboard.rerunJob(queue, jobId)` | `() => Promise<{ queued: true }>` | Re-queue a job by ID |
+| `dashboard.rerunJob({ queue, jobId })` | `() => Promise<{ queued: true }>` | Re-queue a job by ID |
 | `dashboard.getStats()` | `() => Promise<QueueStats[]>` | Queue stats only |
 | `dashboard.getRecentJobs(limit?)` | `() => Promise<JobInfo[]>` | Recent jobs only |
 
@@ -160,7 +160,7 @@ const rerunJob = command(
   z.object({ queue: z.string(), jobId: z.string() }),
   async ({ queue, jobId }) => {
     // Add your own auth check here
-    return dashboard.rerunJob(queue, jobId);
+    return dashboard.rerunJob({ queue, jobId });
   }
 );
 
