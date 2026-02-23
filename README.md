@@ -1,28 +1,19 @@
-# @justinyahin/sveltekit-pgboss
+# @segbedji/sveltekit-pgboss
 
 A reusable [pg-boss](https://github.com/timgit/pg-boss) job system for SvelteKit projects. Provides a single factory function that sets up a pg-boss instance with queue management, worker registration, schedule registration, orphan cleanup, and a dashboard data layer — so you can drop background jobs into any SvelteKit app without re-writing the boilerplate.
 
 ## Install
 
-This package is published to GitHub Packages.
-
-**1. Configure your `.npmrc`** (in your consuming project root):
-
-```
-@justinyahin:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
-```
-
-**2. Install:**
-
 ```bash
-bun add @justinyahin/sveltekit-pgboss
+npm install @segbedji/sveltekit-pgboss
+# or
+bun add @segbedji/sveltekit-pgboss
 ```
 
 ## Quick Start
 
 ```ts
-import { createJobSystem } from '@justinyahin/sveltekit-pgboss';
+import { createJobSystem } from '@segbedji/sveltekit-pgboss';
 
 const { getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
   connectionString: process.env.DATABASE_URL!,
@@ -91,7 +82,7 @@ Returns `{ getBoss, stopBoss, initJobs, dashboard }`.
 
 ```ts
 // src/lib/server/jobs/index.ts
-import { createJobSystem } from '@justinyahin/sveltekit-pgboss';
+import { createJobSystem } from '@segbedji/sveltekit-pgboss';
 import { handleSendEmail } from './handlers/send-email.js';
 import { handleGenerateReport } from './handlers/generate-report.js';
 
@@ -259,7 +250,7 @@ import type {
   QueueStats,
   JobInfo,
   DashboardData,
-} from '@justinyahin/sveltekit-pgboss';
+} from '@segbedji/sveltekit-pgboss';
 ```
 
 ## License

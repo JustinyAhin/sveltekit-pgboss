@@ -68,12 +68,12 @@ No test suite yet. Test by linking into a consumer project:
 bun link
 
 # In the consumer project (e.g. whatisthatmovie)
-bun link @justinyahin/sveltekit-pgboss
+bun link @segbedji/sveltekit-pgboss
 ```
 
 ## Publishing
 
-Published to GitHub Packages under `@justinyahin/sveltekit-pgboss`.
+Published to npm under `@segbedji/sveltekit-pgboss`.
 
 ```bash
 bun run build && npm publish

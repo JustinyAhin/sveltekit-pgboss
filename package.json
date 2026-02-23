@@ -1,45 +1,47 @@
 {
-	"name": "@justinyahin/sveltekit-pgboss",
-	"version": "0.1.0",
-	"description": "Reusable pg-boss job system for SvelteKit projects",
-	"type": "module",
-	"main": "./dist/index.cjs",
-	"module": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js",
-			"require": "./dist/index.cjs"
-		}
-	},
-	"files": ["dist"],
-	"scripts": {
-		"build": "tsup",
-		"lint": "oxlint src/",
-		"format": "oxfmt src/ tsup.config.ts",
-		"format:check": "oxfmt --check src/ tsup.config.ts",
-		"typecheck": "tsc --noEmit",
-		"check": "oxlint src/ && tsc --noEmit && oxfmt --check src/",
-		"prepublishOnly": "bun run build"
-	},
-	"publishConfig": {
-		"registry": "https://npm.pkg.github.com"
-	},
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/JustinyAhin/sveltekit-pgboss"
-	},
-	"license": "MIT",
-	"dependencies": {
-		"pg": "^8.18.0",
-		"pg-boss": "^12.13.0"
-	},
-	"devDependencies": {
-		"@types/pg": "^8.16.0",
-		"oxfmt": "^0.34.0",
-		"oxlint": "^1.49.0",
-		"tsup": "^8.5.1",
-		"typescript": "^5.9.3"
-	}
+    "name": "@segbedji/sveltekit-pgboss",
+    "version": "0.0.2",
+    "description": "Reusable pg-boss job system for SvelteKit projects",
+    "type": "module",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsup",
+        "lint": "oxlint src/",
+        "format": "oxfmt src/ tsup.config.ts",
+        "format:check": "oxfmt --check src/ tsup.config.ts",
+        "typecheck": "tsc --noEmit",
+        "check": "oxlint src/ && tsc --noEmit && oxfmt --check src/",
+        "prepublishOnly": "bun run build"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/JustinyAhin/sveltekit-pgboss"
+    },
+    "license": "MIT",
+    "dependencies": {
+        "pg": "^8.18.0",
+        "pg-boss": "^12.13.0"
+    },
+    "devDependencies": {
+        "@types/pg": "^8.16.0",
+        "oxfmt": "^0.34.0",
+        "oxlint": "^1.49.0",
+        "tsup": "^8.5.1",
+        "typescript": "^5.9.3"
+    }
 }
