@@ -1,11 +1,11 @@
-import type PgBoss from 'pg-boss';
-import { Pool } from 'pg';
-import type { JobSystemConfig, QueueConfig } from './types.js';
+import type { PgBoss } from "pg-boss";
+import { Pool } from "pg";
+import type { JobSystemConfig, QueueConfig } from "./types.js";
 
 const cleanOrphanedJobs = async (opts: { connectionString: string; schema: string }) => {
-	const pool = new Pool({ connectionString: opts.connectionString });
-	try {
-		const result = await pool.query<{ count: number }>(`
+  const pool = new Pool({ connectionString: opts.connectionString });
+  try {
+    const result = await pool.query<{ count: number }>(`
 			WITH failed AS (
 				UPDATE ${opts.schema}.job
 				SET state = CASE
@@ -20,93 +20,87 @@ const cleanOrphanedJobs = async (opts: { connectionString: string; schema: strin
 			)
 			SELECT count(*)::int AS count FROM failed
 		`);
-		const count = result.rows[0]?.count ?? 0;
-		console.log(`[pg-boss] failed ${count} orphaned active jobs`);
-	} finally {
-		await pool.end();
-	}
+    const count = result.rows[0]?.count ?? 0;
+    console.log(`[pg-boss] failed ${count} orphaned active jobs`);
+  } finally {
+    await pool.end();
+  }
 };
 
-const ensureQueues = async (opts: {
-	boss: PgBoss;
-	queues: Record<string, QueueConfig>;
-}) => {
-	for (const [name, config] of Object.entries(opts.queues)) {
-		const existing = await opts.boss.getQueue(name);
-		if (!existing) {
-			await opts.boss.createQueue(name);
-			console.log(`[pg-boss] created queue: ${name}`);
-		}
+const ensureQueues = async (opts: { boss: PgBoss; queues: Record<string, QueueConfig> }) => {
+  for (const [name, config] of Object.entries(opts.queues)) {
+    const existing = await opts.boss.getQueue(name);
+    if (!existing) {
+      await opts.boss.createQueue(name);
+      console.log(`[pg-boss] created queue: ${name}`);
+    }
 
-		const updateConfig: { expireInSeconds?: number; retryLimit?: number } = {};
-		if (config.expireInSeconds !== undefined) updateConfig.expireInSeconds = config.expireInSeconds;
-		if (config.retryLimit !== undefined) updateConfig.retryLimit = config.retryLimit;
+    const updateConfig: { expireInSeconds?: number; retryLimit?: number } = {};
+    if (config.expireInSeconds !== undefined) updateConfig.expireInSeconds = config.expireInSeconds;
+    if (config.retryLimit !== undefined) updateConfig.retryLimit = config.retryLimit;
 
-		if (Object.keys(updateConfig).length > 0) {
-			await opts.boss.updateQueue(name, updateConfig);
-		}
-	}
+    if (Object.keys(updateConfig).length > 0) {
+      await opts.boss.updateQueue(name, updateConfig);
+    }
+  }
 };
 
-const registerWorkers = async (opts: {
-	boss: PgBoss;
-	queues: Record<string, QueueConfig>;
-}) => {
-	for (const [name, config] of Object.entries(opts.queues)) {
-		const batchSize = config.batchSize ?? 1;
+const registerWorkers = async (opts: { boss: PgBoss; queues: Record<string, QueueConfig> }) => {
+  for (const [name, config] of Object.entries(opts.queues)) {
+    const batchSize = config.batchSize ?? 1;
 
-		await opts.boss.work(name, { batchSize }, async (jobs) => {
-			if (batchSize === 1) {
-				await config.handler(jobs[0]!.data);
-			} else {
-				await Promise.all(jobs.map((job) => config.handler(job.data)));
-			}
-		});
-	}
+    await opts.boss.work(name, { batchSize }, async (jobs) => {
+      if (batchSize === 1) {
+        await config.handler(jobs[0]!.data);
+      } else {
+        await Promise.all(jobs.map((job) => config.handler(job.data)));
+      }
+    });
+  }
 };
 
 const registerSchedules = async (opts: {
-	boss: PgBoss;
-	schedules: JobSystemConfig['schedules'];
+  boss: PgBoss;
+  schedules: JobSystemConfig["schedules"];
 }) => {
-	if (!opts.schedules?.length) return;
+  if (!opts.schedules?.length) return;
 
-	for (const schedule of opts.schedules) {
-		await opts.boss.schedule(schedule.queue, schedule.cron);
-	}
+  for (const schedule of opts.schedules) {
+    await opts.boss.schedule(schedule.queue, schedule.cron);
+  }
 };
 
 const createInitJobs = (opts: {
-	connectionString: string;
-	schema: string;
-	queues: Record<string, QueueConfig>;
-	schedules?: JobSystemConfig['schedules'];
-	cleanOrphans: boolean;
-	getBoss: () => Promise<PgBoss>;
+  connectionString: string;
+  schema: string;
+  queues: Record<string, QueueConfig>;
+  schedules?: JobSystemConfig["schedules"];
+  cleanOrphans: boolean;
+  getBoss: () => Promise<PgBoss>;
 }) => {
-	let initialized = false;
+  let initialized = false;
 
-	const initJobs = async () => {
-		if (initialized) return;
-		initialized = true;
+  const initJobs = async () => {
+    if (initialized) return;
+    initialized = true;
 
-		const boss = await opts.getBoss();
+    const boss = await opts.getBoss();
 
-		if (opts.cleanOrphans) {
-			await cleanOrphanedJobs({
-				connectionString: opts.connectionString,
-				schema: opts.schema
-			});
-		}
+    if (opts.cleanOrphans) {
+      await cleanOrphanedJobs({
+        connectionString: opts.connectionString,
+        schema: opts.schema,
+      });
+    }
 
-		await ensureQueues({ boss, queues: opts.queues });
-		await registerWorkers({ boss, queues: opts.queues });
-		await registerSchedules({ boss, schedules: opts.schedules });
+    await ensureQueues({ boss, queues: opts.queues });
+    await registerWorkers({ boss, queues: opts.queues });
+    await registerSchedules({ boss, schedules: opts.schedules });
 
-		console.log('[pg-boss] handlers registered');
-	};
+    console.log("[pg-boss] handlers registered");
+  };
 
-	return initJobs;
+  return initJobs;
 };
 
 export { createInitJobs };

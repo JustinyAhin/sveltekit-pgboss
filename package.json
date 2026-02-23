@@ -16,6 +16,11 @@
 	"files": ["dist"],
 	"scripts": {
 		"build": "tsup",
+		"lint": "oxlint src/",
+		"format": "oxfmt src/ tsup.config.ts",
+		"format:check": "oxfmt --check src/ tsup.config.ts",
+		"typecheck": "tsc --noEmit",
+		"check": "oxlint src/ && tsc --noEmit && oxfmt --check src/",
 		"prepublishOnly": "bun run build"
 	},
 	"publishConfig": {
@@ -32,6 +37,8 @@
 	},
 	"devDependencies": {
 		"@types/pg": "^8.16.0",
+		"oxfmt": "^0.34.0",
+		"oxlint": "^1.49.0",
 		"tsup": "^8.5.1",
 		"typescript": "^5.9.3"
 	}
