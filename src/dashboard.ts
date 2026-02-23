@@ -1,13 +1,7 @@
 import { Pool } from "pg";
-import type { PgBoss } from "pg-boss";
-import type { QueueStats, JobInfo, DashboardData, AnyJob } from "./types.js";
+import type { AnyJob, CreateDashboardOpts, DashboardData, JobInfo, QueueStats } from "./types.js";
 
-const createDashboard = (opts: {
-  connectionString: string;
-  schema: string;
-  queueNames: string[];
-  getBoss: () => Promise<PgBoss>;
-}) => {
+const createDashboard = (opts: CreateDashboardOpts) => {
   const getStats = async (): Promise<QueueStats[]> => {
     const pool = new Pool({ connectionString: opts.connectionString });
     try {
@@ -60,7 +54,7 @@ const createDashboard = (opts: {
     return { queues, jobs };
   };
 
-  const rerunJob = async (queue: string, jobId: string) => {
+  const rerunJob = async ({ queue, jobId }: { queue: string; jobId: string }) => {
     const boss = await opts.getBoss();
     const [job] = await boss.findJobs(queue, { id: jobId });
     if (!job) throw new Error(`Job ${jobId} not found in queue ${queue}`);

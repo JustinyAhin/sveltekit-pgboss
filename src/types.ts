@@ -1,4 +1,4 @@
-import type { JobWithMetadata } from "pg-boss";
+import type { JobWithMetadata, PgBoss } from "pg-boss";
 
 type QueueConfig<T = unknown> = {
   handler: (data: T) => Promise<void>;
@@ -50,6 +50,13 @@ type DashboardData = {
 
 type AnyJob = JobWithMetadata<Record<string, unknown>>;
 
+type CreateDashboardOpts = {
+  connectionString: string;
+  schema: string;
+  queueNames: string[];
+  getBoss: () => Promise<PgBoss>;
+};
+
 export type {
   QueueConfig,
   ScheduleConfig,
@@ -58,4 +65,5 @@ export type {
   JobInfo,
   DashboardData,
   AnyJob,
+  CreateDashboardOpts,
 };
