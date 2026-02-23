@@ -8,15 +8,15 @@ const createDashboard = (opts: CreateDashboardOpts) => {
       const result = await pool.query<QueueStats>(
         `
 				SELECT
-					name,
-					(count(*) FILTER (WHERE state < 'active' AND start_after <= now()))::int AS "queuedCount",
-					(count(*) FILTER (WHERE state = 'active'))::int AS "activeCount",
-					(count(*) FILTER (WHERE start_after > now()))::int AS "deferredCount",
-					count(*)::int AS "totalCount"
-				FROM ${opts.schema}.job
-				WHERE name = ANY($1::text[])
-				GROUP BY name
-				ORDER BY name
+					q.name,
+					coalesce((count(*) FILTER (WHERE j.state < 'active' AND j.start_after <= now()))::int, 0) AS "queuedCount",
+					coalesce((count(*) FILTER (WHERE j.state = 'active'))::int, 0) AS "activeCount",
+					coalesce((count(*) FILTER (WHERE j.start_after > now()))::int, 0) AS "deferredCount",
+					coalesce((count(j.id))::int, 0) AS "totalCount"
+				FROM unnest($1::text[]) AS q(name)
+				LEFT JOIN ${opts.schema}.job j ON j.name = q.name
+				GROUP BY q.name
+				ORDER BY q.name
 				`,
         [opts.queueNames],
       );
