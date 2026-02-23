@@ -45,15 +45,25 @@ const ensureQueues = async (opts: { boss: PgBoss; queues: Record<string, QueueCo
   }
 };
 
-const registerWorkers = async (opts: { boss: PgBoss; queues: Record<string, QueueConfig> }) => {
+const registerWorkers = async (opts: {
+  boss: PgBoss;
+  queues: Record<string, QueueConfig>;
+  handlers: Record<string, (data: unknown) => Promise<void>>;
+}) => {
   for (const [name, config] of Object.entries(opts.queues)) {
+    const handler = opts.handlers[name];
+
+    if (!handler) {
+      throw new Error(`[pg-boss] queue "${name}" has no handler.`);
+    }
+
     const batchSize = config.batchSize ?? 1;
 
     await opts.boss.work(name, { batchSize }, async (jobs) => {
       if (batchSize === 1) {
-        await config.handler(jobs[0]!.data);
+        await handler(jobs[0]!.data);
       } else {
-        await Promise.all(jobs.map((job) => config.handler(job.data)));
+        await Promise.all(jobs.map((job) => handler(job.data)));
       }
     });
   }
@@ -80,7 +90,7 @@ const createInitJobs = (opts: {
 }) => {
   let initialized = false;
 
-  const initJobs = async () => {
+  const initJobs = async (handlers: Record<string, (data: unknown) => Promise<void>>) => {
     if (initialized) return;
     initialized = true;
 
@@ -94,7 +104,7 @@ const createInitJobs = (opts: {
     }
 
     await ensureQueues({ boss, queues: opts.queues });
-    await registerWorkers({ boss, queues: opts.queues });
+    await registerWorkers({ boss, queues: opts.queues, handlers });
     await registerSchedules({ boss, schedules: opts.schedules });
 
     console.log("[pg-boss] handlers registered");

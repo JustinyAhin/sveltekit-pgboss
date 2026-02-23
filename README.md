@@ -13,27 +13,27 @@ bun add @segbedji/sveltekit-pgboss
 ## Quick Start
 
 ```ts
-import { createJobSystem } from '@segbedji/sveltekit-pgboss';
+import { createJobSystem, queue } from '@segbedji/sveltekit-pgboss';
 
-const { send, getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
+const { send, initJobs } = createJobSystem({
   connectionString: process.env.DATABASE_URL!,
   queues: {
-    'send-email': {
-      handler: async (data: { to: string; subject: string }) => {
-        console.log('Sending email to', data.to);
-      },
-      retryLimit: 3,
-    },
-    'generate-report': {
-      handler: async (data: { type: string }) => {
-        console.log('Generating report', data.type);
-      },
-      expireInSeconds: 3600,
-    },
+    'send-email': queue<{ to: string; subject: string }>({ retryLimit: 3 }),
+    'generate-report': queue<{ type: string }>({ expireInSeconds: 3600 }),
   },
   schedules: [
     { queue: 'generate-report', cron: '0 8 * * 1' }, // every Monday 8 AM
   ],
+});
+
+// Initialize with handlers
+await initJobs({
+  'send-email': async (data) => {
+    console.log('Sending email to', data.to);
+  },
+  'generate-report': async (data) => {
+    console.log('Generating report', data.type);
+  },
 });
 
 // Type-safe: queue name and payload are checked at compile time
@@ -58,20 +58,30 @@ Returns `{ send, getBoss, stopBoss, initJobs, dashboard }`.
 |---|---|---|---|
 | `connectionString` | `string` | *required* | PostgreSQL connection string |
 | `schema` | `string` | `'pgboss'` | pg-boss schema name |
-| `queues` | `Record<string, QueueConfig<T>>` | *required* | Queue definitions with typed handlers |
+| `queues` | `Record<string, QueueConfig<T>>` | *required* | Queue definitions created with `queue<T>()` |
 | `schedules` | `ScheduleConfig[]` | `[]` | Cron schedules |
 | `cleanOrphans` | `boolean` | `true` | Fail orphaned active jobs on startup |
 | `onError` | `(err: Error) => void` | `console.error` | Error handler |
 
-#### QueueConfig
+#### `queue<T>(config?)`
+
+Creates a typed queue definition. The type parameter `T` defines the payload shape for `send()` and the handler.
+
+```ts
+import { queue } from '@segbedji/sveltekit-pgboss';
+
+// With config
+queue<{ to: string; subject: string }>({ retryLimit: 3, expireInSeconds: 3600 })
+
+// Without config (defaults only)
+queue<{ to: string }>()
+```
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `handler` | `(data: T) => Promise<void>` | *required* | Job handler function |
 | `batchSize` | `number` | `1` | Jobs per batch |
 | `expireInSeconds` | `number` | pg-boss default | Job expiration |
 | `retryLimit` | `number` | pg-boss default | Max retries |
-| `retryDelay` | `number` | pg-boss default | Delay between retries (seconds) |
 
 #### Returned Object
 
@@ -80,7 +90,7 @@ Returns `{ send, getBoss, stopBoss, initJobs, dashboard }`.
 | `send` | `(opts: { name, data, options? }) => Promise<string \| null>` | Type-safe job sender — queue name and payload are validated at compile time |
 | `getBoss` | `() => Promise<PgBoss>` | Get the raw pg-boss instance (starts it on first call) |
 | `stopBoss` | `() => Promise<void>` | Graceful shutdown |
-| `initJobs` | `() => Promise<void>` | Initialize: clean orphans, create queues, register workers & schedules |
+| `initJobs` | `(handlers) => Promise<void>` | Initialize: clean orphans, create queues, register workers & schedules. Handlers are required for every queue. |
 | `dashboard.getData(limit?)` | `() => Promise<DashboardData>` | Queue stats + recent jobs |
 | `dashboard.rerunJob({ queue, jobId })` | `() => Promise<{ queued: true }>` | Re-queue a job by ID |
 | `dashboard.getStats()` | `() => Promise<QueueStats[]>` | Queue stats only |
@@ -90,24 +100,20 @@ Returns `{ send, getBoss, stopBoss, initJobs, dashboard }`.
 
 ### Define your job system
 
+Queue definitions and handlers live in separate files. This avoids circular imports when handlers need to call `send`.
+
 ```ts
-// src/lib/server/jobs/index.ts
-import { createJobSystem } from '@segbedji/sveltekit-pgboss';
-import { handleSendEmail } from './handlers/send-email.js';
-import { handleGenerateReport } from './handlers/generate-report.js';
+// src/lib/server/jobs/system.ts — defines queues, exports send
+import { createJobSystem, queue } from '@segbedji/sveltekit-pgboss';
 
 const { send, getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
   connectionString: process.env.DATABASE_URL!,
   queues: {
-    'send-email': {
-      handler: handleSendEmail,
-      retryLimit: 3,
-    },
-    'generate-report': {
-      handler: handleGenerateReport,
+    'send-email': queue<{ to: string; subject: string }>({ retryLimit: 3 }),
+    'generate-report': queue<{ type: string }>({
       expireInSeconds: 3600,
       retryLimit: 2,
-    },
+    }),
   },
   schedules: [
     { queue: 'generate-report', cron: '0 8 * * 1' },
@@ -115,6 +121,34 @@ const { send, getBoss, stopBoss, initJobs, dashboard } = createJobSystem({
 });
 
 export { send, getBoss, stopBoss, initJobs, dashboard };
+```
+
+```ts
+// src/lib/server/jobs/index.ts — wires handlers
+import { initJobs } from './system';
+import { handleSendEmail } from './handlers/send-email';
+import { handleGenerateReport } from './handlers/generate-report';
+
+const init = () =>
+  initJobs({
+    'send-email': handleSendEmail,
+    'generate-report': handleGenerateReport,
+  });
+
+export { init as initJobs };
+```
+
+Handlers can safely import `send` from `system.ts` without creating a circular dependency:
+
+```ts
+// src/lib/server/jobs/handlers/send-email.ts
+import { send } from '../system';
+
+const handleSendEmail = async (data: { to: string; subject: string }) => {
+  // ... can use send() to enqueue other jobs
+};
+
+export { handleSendEmail };
 ```
 
 ### Start workers in `hooks.server.ts`
@@ -136,7 +170,7 @@ Set `ENABLE_WORKER=true` on the process that should run workers. This lets you r
 ### Send jobs from anywhere
 
 ```ts
-import { send } from '$lib/server/jobs';
+import { send } from '$lib/server/jobs/system';
 
 // Type-safe: TS validates queue name and payload
 await send({ name: 'send-email', data: { to: 'user@example.com', subject: 'Hello' } });
@@ -149,7 +183,7 @@ Wrap the dashboard helpers in SvelteKit remote functions for your admin panel:
 ```ts
 // src/lib/remote-functions/admin/jobs.remote.ts
 import { command, query } from '$app/server';
-import { dashboard } from '$lib/server/jobs';
+import { dashboard } from '$lib/server/jobs/system';
 import { z } from 'zod';
 
 const getJobsDashboard = query(async () => {
@@ -256,6 +290,7 @@ All types are exported:
 import type {
   JobSystemConfig,
   PayloadMap,
+  HandlersMap,
   QueueConfig,
   ScheduleConfig,
   QueueStats,

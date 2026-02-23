@@ -1,7 +1,8 @@
 import type { JobWithMetadata, PgBoss } from "pg-boss";
 
 type QueueConfig<T = unknown> = {
-  handler: (data: T) => Promise<void>;
+  /** @internal Phantom field for type inference — never set at runtime. */
+  __payload?: T;
   batchSize?: number;
   expireInSeconds?: number;
   retryLimit?: number;
@@ -23,6 +24,10 @@ type JobSystemConfig<Q extends Record<string, QueueConfig<any>> = Record<string,
 
 type PayloadMap<Q extends Record<string, QueueConfig<any>>> = {
   [K in keyof Q]: Q[K] extends QueueConfig<infer T> ? T : never;
+};
+
+type HandlersMap<Q extends Record<string, QueueConfig<any>>> = {
+  [K in keyof Q & string]: (data: PayloadMap<Q>[K]) => Promise<void>;
 };
 
 type QueueStats = {
@@ -66,6 +71,7 @@ export type {
   ScheduleConfig,
   JobSystemConfig,
   PayloadMap,
+  HandlersMap,
   QueueStats,
   JobInfo,
   DashboardData,
