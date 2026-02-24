@@ -70,6 +70,16 @@ type DashboardData = {
   pagination: PaginationInfo;
 };
 
+type Dashboard = {
+  getStats: () => Promise<QueueStats[]>;
+  getRecentJobs: (opts?: {
+    page?: number;
+    perPage?: number;
+  }) => Promise<{ jobs: JobInfo[]; pagination: PaginationInfo }>;
+  getData: (opts?: { page?: number; perPage?: number }) => Promise<DashboardData>;
+  rerunJob: (opts: { queue: string; jobId: string }) => Promise<{ queued: boolean }>;
+};
+
 type AnyJob = JobWithMetadata<Record<string, unknown>>;
 
 type CreateDashboardOpts = {
@@ -89,6 +99,7 @@ export type {
   JobInfo,
   PaginationInfo,
   DashboardData,
+  Dashboard,
   AnyJob,
   CreateDashboardOpts,
 };

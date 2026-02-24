@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.8-beta.0
+## 0.0.9-beta.0
 
 ### Breaking Changes
 
@@ -10,7 +10,9 @@
 
 - Add pagination support to `dashboard.getData()` and `dashboard.getRecentJobs()` with `page`/`perPage` params, total count query, and `PaginationInfo` in the response
 - Allow handlers to return values — `HandlersMap` return type changed from `Promise<void>` to `Promise<unknown>` (pg-boss stores the return value as job output)
-- Export `PaginationInfo` type
+- Export `PaginationInfo` and `Dashboard` types
+- Add JSR publishing support (`deno.json`)
+- Add explicit return type to `createJobSystem` (required by JSR slow-type checks)
 
 ### Testing
 

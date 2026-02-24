@@ -1,8 +1,8 @@
-import type { SendOptions } from "pg-boss";
+import type { PgBoss, SendOptions } from "pg-boss";
 import { createBossManager } from "./boss.js";
 import { createInitJobs } from "./init.js";
 import { createDashboard } from "./dashboard.js";
-import type { HandlersMap, JobSystemConfig, PayloadMap, QueueConfig } from "./types.js";
+import type { Dashboard, HandlersMap, JobSystemConfig, PayloadMap, QueueConfig } from "./types.js";
 
 /**
  * Define a typed queue. The generic parameter `T` sets the payload type
@@ -25,7 +25,17 @@ const queue = <T>(config?: Omit<QueueConfig<T>, "__payload">): QueueConfig<T> =>
  */
 const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
   config: JobSystemConfig<Q>,
-) => {
+): {
+  getBoss: () => Promise<PgBoss>;
+  stopBoss: () => Promise<void>;
+  initJobs: (handlers: HandlersMap<Q>) => Promise<void>;
+  dashboard: Dashboard;
+  send: <K extends keyof PayloadMap<Q> & string>(opts: {
+    name: K;
+    data: PayloadMap<Q>[K];
+    options?: SendOptions;
+  }) => Promise<string | null>;
+} => {
   type Payloads = PayloadMap<Q>;
 
   const schema = config.schema ?? "pgboss";
@@ -85,4 +95,5 @@ export type {
   JobInfo,
   PaginationInfo,
   DashboardData,
+  Dashboard,
 } from "./types.js";

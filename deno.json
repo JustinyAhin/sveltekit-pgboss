@@ -1,0 +1,13 @@
+{
+    "name": "@segbedji/sveltekit-pgboss",
+    "version": "0.0.9-beta.0",
+    "exports": "./src/index.ts",
+    "publish": {
+        "include": ["src/**/*.ts", "README.md", "LICENSE"],
+        "exclude": ["src/__tests__/**"]
+    },
+    "imports": {
+        "pg-boss": "npm:pg-boss@^12.13.0",
+        "pg": "npm:pg@^8.18.0"
+    }
+}
