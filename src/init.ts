@@ -67,7 +67,7 @@ const registerWorkers = async (opts: {
           await handler(job.data);
         } catch (err) {
           if (config.onFailed && job.retryCount >= job.retryLimit) {
-            await config.onFailed(job.data, err);
+            await config.onFailed({ data: job.data, error: err });
           }
           throw err;
         }
@@ -81,7 +81,7 @@ const registerWorkers = async (opts: {
             await Promise.all(
               failed
                 .filter((f) => f.job.retryCount >= f.job.retryLimit)
-                .map((f) => config.onFailed!(f.job.data, f.reason)),
+                .map((f) => config.onFailed!({ data: f.job.data, error: f.reason })),
             );
           }
           await opts.boss.fail(
