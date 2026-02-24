@@ -1,6 +1,6 @@
 {
     "name": "@segbedji/sveltekit-pgboss",
-    "version": "0.0.7-beta.0",
+    "version": "0.0.8-beta.0",
     "description": "Reusable pg-boss job system for SvelteKit projects",
     "type": "module",
     "main": "./dist/index.cjs",

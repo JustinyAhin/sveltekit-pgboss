@@ -26,8 +26,8 @@ describe("type-level tests", () => {
     };
     type Handlers = HandlersMap<Queues>;
 
-    expectTypeOf<Handlers["email"]>().toEqualTypeOf<(data: { to: string }) => Promise<void>>();
-    expectTypeOf<Handlers["sms"]>().toEqualTypeOf<(data: { phone: number }) => Promise<void>>();
+    expectTypeOf<Handlers["email"]>().toEqualTypeOf<(data: { to: string }) => Promise<unknown>>();
+    expectTypeOf<Handlers["sms"]>().toEqualTypeOf<(data: { phone: number }) => Promise<unknown>>();
   });
 
   it("send() enforces correct payload per queue name", () => {

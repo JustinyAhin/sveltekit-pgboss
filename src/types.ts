@@ -32,7 +32,7 @@ type PayloadMap<Q extends Record<string, QueueConfig<any>>> = {
 
 /** Maps each queue name to a handler function with the correct payload type. */
 type HandlersMap<Q extends Record<string, QueueConfig<any>>> = {
-  [K in keyof Q & string]: (data: PayloadMap<Q>[K]) => Promise<void>;
+  [K in keyof Q & string]: (data: PayloadMap<Q>[K]) => Promise<unknown>;
 };
 
 type QueueStats = {
@@ -57,9 +57,17 @@ type JobInfo = {
   output: unknown;
 };
 
+type PaginationInfo = {
+  page: number;
+  totalPages: number;
+  totalCount: number;
+  perPage: number;
+};
+
 type DashboardData = {
   queues: QueueStats[];
   jobs: JobInfo[];
+  pagination: PaginationInfo;
 };
 
 type AnyJob = JobWithMetadata<Record<string, unknown>>;
@@ -79,6 +87,7 @@ export type {
   HandlersMap,
   QueueStats,
   JobInfo,
+  PaginationInfo,
   DashboardData,
   AnyJob,
   CreateDashboardOpts,

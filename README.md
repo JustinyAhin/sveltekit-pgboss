@@ -94,10 +94,10 @@ queue<{ to: string }>()
 | `getBoss` | `() => Promise<PgBoss>` | Get the raw pg-boss instance (starts it on first call) |
 | `stopBoss` | `() => Promise<void>` | Graceful shutdown |
 | `initJobs` | `(handlers) => Promise<void>` | Initialize: clean orphans, create queues, register workers & schedules. Handlers are required for every queue. |
-| `dashboard.getData(limit?)` | `() => Promise<DashboardData>` | Queue stats + recent jobs |
+| `dashboard.getData({ page?, perPage? })` | `() => Promise<DashboardData>` | Queue stats + paginated jobs (default: page 1, 50 per page) |
 | `dashboard.rerunJob({ queue, jobId })` | `() => Promise<{ queued: true }>` | Re-queue a job by ID |
 | `dashboard.getStats()` | `() => Promise<QueueStats[]>` | Queue stats only |
-| `dashboard.getRecentJobs(limit?)` | `() => Promise<JobInfo[]>` | Recent jobs only |
+| `dashboard.getRecentJobs({ page?, perPage? })` | `() => Promise<{ jobs: JobInfo[], pagination: PaginationInfo }>` | Paginated jobs (default: page 1, 50 per page) |
 
 ## Usage with SvelteKit
 
@@ -189,10 +189,13 @@ import { command, query } from '$app/server';
 import { dashboard } from '$lib/server/jobs/system';
 import { z } from 'zod';
 
-const getJobsDashboard = query(async () => {
-  // Add your own auth check here
-  return dashboard.getData();
-});
+const getJobsDashboard = query(
+  z.object({ page: z.number().optional(), perPage: z.number().optional() }),
+  async ({ page, perPage }) => {
+    // Add your own auth check here
+    return dashboard.getData({ page, perPage });
+  }
+);
 
 const rerunJob = command(
   z.object({ queue: z.string(), jobId: z.string() }),
@@ -224,7 +227,7 @@ A minimal admin page using the remote functions above:
 
 {#await data}
   <p>Loading...</p>
-{:then { queues, jobs }}
+{:then { queues, jobs, pagination }}
   <h2>Queues</h2>
   <table>
     <thead>
@@ -298,6 +301,7 @@ import type {
   ScheduleConfig,
   QueueStats,
   JobInfo,
+  PaginationInfo,
   DashboardData,
 } from '@segbedji/sveltekit-pgboss';
 ```

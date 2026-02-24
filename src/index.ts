@@ -50,7 +50,7 @@ const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
   // Cast erases the per-queue payload types so init.ts can work with a uniform signature.
   // Type safety is enforced at the call site via HandlersMap<Q>.
   const initJobs = (handlers: HandlersMap<Q>) =>
-    _initJobs(handlers as Record<string, (data: unknown) => Promise<void>>);
+    _initJobs(handlers as Record<string, (data: unknown) => Promise<unknown>>);
 
   const queueNames = Object.keys(config.queues);
 
@@ -83,5 +83,6 @@ export type {
   ScheduleConfig,
   QueueStats,
   JobInfo,
+  PaginationInfo,
   DashboardData,
 } from "./types.js";

@@ -1,5 +1,11 @@
 import { Pool } from "pg";
-import type { CreateDashboardOpts, DashboardData, JobInfo, QueueStats } from "./types.js";
+import type {
+  CreateDashboardOpts,
+  DashboardData,
+  JobInfo,
+  PaginationInfo,
+  QueueStats,
+} from "./types.js";
 
 // Raw SQL is used instead of pg-boss APIs because pg-boss has no aggregation/stats queries.
 const createDashboard = (opts: CreateDashboardOpts) => {
@@ -30,9 +36,14 @@ const createDashboard = (opts: CreateDashboardOpts) => {
     return result.rows;
   };
 
-  const getRecentJobs = async (limit = 50): Promise<JobInfo[]> => {
-    const result = await getPool().query<JobInfo>(
-      `
+  const getRecentJobs = async ({ page = 1, perPage = 50 } = {}): Promise<{
+    jobs: JobInfo[];
+    pagination: PaginationInfo;
+  }> => {
+    const offset = (page - 1) * perPage;
+    const [jobsResult, countResult] = await Promise.all([
+      getPool().query<JobInfo>(
+        `
 				SELECT
 					id, name, state,
 					data,
@@ -46,16 +57,28 @@ const createDashboard = (opts: CreateDashboardOpts) => {
 				FROM ${opts.schema}.job
 				WHERE name = ANY($1)
 				ORDER BY created_on DESC
-				LIMIT $2
+				LIMIT $2 OFFSET $3
 				`,
-      [opts.queueNames, limit],
-    );
-    return result.rows;
+        [opts.queueNames, perPage, offset],
+      ),
+      getPool().query<{ count: number }>(
+        `SELECT count(*)::int AS count FROM ${opts.schema}.job WHERE name = ANY($1)`,
+        [opts.queueNames],
+      ),
+    ]);
+    const totalCount = countResult.rows[0]?.count ?? 0;
+    return {
+      jobs: jobsResult.rows,
+      pagination: { page, totalPages: Math.ceil(totalCount / perPage), totalCount, perPage },
+    };
   };
 
-  const getData = async (limit = 50): Promise<DashboardData> => {
-    const [queues, jobs] = await Promise.all([getStats(), getRecentJobs(limit)]);
-    return { queues, jobs };
+  const getData = async ({ page = 1, perPage = 50 } = {}): Promise<DashboardData> => {
+    const [queues, { jobs, pagination }] = await Promise.all([
+      getStats(),
+      getRecentJobs({ page, perPage }),
+    ]);
+    return { queues, jobs, pagination };
   };
 
   const rerunJob = async ({ queue, jobId }: { queue: string; jobId: string }) => {

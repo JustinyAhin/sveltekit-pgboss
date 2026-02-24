@@ -54,7 +54,7 @@ const ensureQueues = async (opts: { boss: PgBoss; queues: Record<string, QueueCo
 const registerWorkers = async (opts: {
   boss: PgBoss;
   queues: Record<string, QueueConfig>;
-  handlers: Record<string, (data: unknown) => Promise<void>>;
+  handlers: Record<string, (data: unknown) => Promise<unknown>>;
 }) => {
   for (const [name, config] of Object.entries(opts.queues)) {
     const handler = opts.handlers[name];
@@ -129,7 +129,7 @@ const createInitJobs = (opts: {
   // Guard against double-initialization (e.g. HMR in dev or multiple hook calls).
   let initialized = false;
 
-  const initJobs = async (handlers: Record<string, (data: unknown) => Promise<void>>) => {
+  const initJobs = async (handlers: Record<string, (data: unknown) => Promise<unknown>>) => {
     if (initialized) return;
     initialized = true;
 

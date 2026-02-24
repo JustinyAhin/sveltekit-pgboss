@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.0.8-beta.0
+
+### Breaking Changes
+
+- **`dashboard.getData()` and `dashboard.getRecentJobs()` signatures changed** — both now accept `{ page?, perPage? }` instead of a plain `limit` number. `getRecentJobs` returns `{ jobs, pagination }` instead of a flat `JobInfo[]`. `DashboardData` now includes a `pagination` field.
+
+### Features
+
+- Add pagination support to `dashboard.getData()` and `dashboard.getRecentJobs()` with `page`/`perPage` params, total count query, and `PaginationInfo` in the response
+- Allow handlers to return values — `HandlersMap` return type changed from `Promise<void>` to `Promise<unknown>` (pg-boss stores the return value as job output)
+- Export `PaginationInfo` type
+
+### Testing
+
+- Add dashboard test suite (5 tests covering pagination defaults, offset computation, zero-job edge case, getData integration)
+
 ## 0.0.7-beta.0
 
 ### Bug Fixes
