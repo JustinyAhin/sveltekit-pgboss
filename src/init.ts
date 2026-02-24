@@ -35,9 +35,10 @@ const ensureQueues = async (opts: { boss: PgBoss; queues: Record<string, QueueCo
       console.log(`[pg-boss] created queue: ${name}`);
     }
 
-    const updateConfig: { expireInSeconds?: number; retryLimit?: number } = {};
+    const updateConfig: { expireInSeconds?: number; retryLimit?: number; retryDelay?: number } = {};
     if (config.expireInSeconds !== undefined) updateConfig.expireInSeconds = config.expireInSeconds;
     if (config.retryLimit !== undefined) updateConfig.retryLimit = config.retryLimit;
+    if (config.retryDelay !== undefined) updateConfig.retryDelay = config.retryDelay;
 
     if (Object.keys(updateConfig).length > 0) {
       await opts.boss.updateQueue(name, updateConfig);

@@ -6,6 +6,7 @@ type QueueConfig<T = unknown> = {
   batchSize?: number;
   expireInSeconds?: number;
   retryLimit?: number;
+  retryDelay?: number;
 };
 
 type ScheduleConfig = {
