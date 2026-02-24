@@ -2,9 +2,12 @@ import { PgBoss } from "pg-boss";
 
 type BossState = {
   instance: PgBoss | null;
+  // Stored promise prevents concurrent getBoss() calls from creating multiple instances.
   starting: Promise<PgBoss> | null;
 };
 
+// Module-level flag so signal handlers are registered at most once,
+// even if createBossManager is called multiple times in a process.
 let signalHandlersRegistered = false;
 
 const createBossManager = (opts: {

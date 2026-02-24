@@ -4,10 +4,25 @@ import { createInitJobs } from "./init.js";
 import { createDashboard } from "./dashboard.js";
 import type { HandlersMap, JobSystemConfig, PayloadMap, QueueConfig } from "./types.js";
 
+/**
+ * Define a typed queue. The generic parameter `T` sets the payload type
+ * enforced by `send()` and handler signatures.
+ *
+ * @example
+ * const queues = {
+ *   email: queue<{ to: string; body: string }>({ retryLimit: 3 }),
+ * };
+ */
+// The Omit hides __payload from the public API; the cast preserves T for type inference downstream.
 const queue = <T>(config?: Omit<QueueConfig<T>, "__payload">): QueueConfig<T> => {
   return (config ?? {}) as QueueConfig<T>;
 };
 
+/**
+ * Create a pg-boss job system. Returns `send` for enqueuing jobs,
+ * `initJobs` for registering workers (call once at server startup),
+ * and `dashboard` for queue stats / job inspection.
+ */
 const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
   config: JobSystemConfig<Q>,
 ) => {
@@ -31,6 +46,9 @@ const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
     getBoss,
   });
 
+  /** Register worker handlers for all queues. Call once at server startup (idempotent). */
+  // Cast erases the per-queue payload types so init.ts can work with a uniform signature.
+  // Type safety is enforced at the call site via HandlersMap<Q>.
   const initJobs = (handlers: HandlersMap<Q>) =>
     _initJobs(handlers as Record<string, (data: unknown) => Promise<void>>);
 
@@ -43,6 +61,7 @@ const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
     getBoss,
   });
 
+  /** Enqueue a job. The payload type is inferred from the queue definition. */
   const send = async <K extends keyof Payloads & string>(opts: {
     name: K;
     data: Payloads[K];

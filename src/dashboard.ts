@@ -1,19 +1,22 @@
 import { Pool } from "pg";
 import type { CreateDashboardOpts, DashboardData, JobInfo, QueueStats } from "./types.js";
 
+// Raw SQL is used instead of pg-boss APIs because pg-boss has no aggregation/stats queries.
 const createDashboard = (opts: CreateDashboardOpts) => {
+  // Lazy singleton pool — reused across all dashboard calls to avoid per-request connection overhead.
   let pool: Pool | null = null;
   const getPool = () => {
     if (!pool) pool = new Pool({ connectionString: opts.connectionString });
     return pool;
   };
 
+  // pg-boss uses a Postgres enum where 'created' < 'active', so state < 'active' catches queued jobs.
   const getStats = async (): Promise<QueueStats[]> => {
     const result = await getPool().query<QueueStats>(
       `
 				SELECT
 					q.name,
-					coalesce((count(*) FILTER (WHERE j.state < 'active' AND j.start_after <= now()))::int, 0) AS "queuedCount",
+			coalesce((count(*) FILTER (WHERE j.state < 'active' AND j.start_after <= now()))::int, 0) AS "queuedCount",
 					coalesce((count(*) FILTER (WHERE j.state = 'active'))::int, 0) AS "activeCount",
 					coalesce((count(*) FILTER (WHERE j.start_after > now()))::int, 0) AS "deferredCount",
 					coalesce((count(j.id))::int, 0) AS "totalCount"

@@ -25,10 +25,12 @@ type JobSystemConfig<Q extends Record<string, QueueConfig<any>> = Record<string,
   onError?: (err: Error) => void;
 };
 
+/** Extracts each queue's payload type from its QueueConfig, building a { queueName: PayloadType } map. */
 type PayloadMap<Q extends Record<string, QueueConfig<any>>> = {
   [K in keyof Q]: Q[K] extends QueueConfig<infer T> ? T : never;
 };
 
+/** Maps each queue name to a handler function with the correct payload type. */
 type HandlersMap<Q extends Record<string, QueueConfig<any>>> = {
   [K in keyof Q & string]: (data: PayloadMap<Q>[K]) => Promise<void>;
 };

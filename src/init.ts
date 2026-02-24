@@ -2,6 +2,9 @@ import type { PgBoss } from "pg-boss";
 import { Pool } from "pg";
 import type { JobSystemConfig, QueueConfig } from "./types.js";
 
+// On server restart, jobs left in 'active' state are orphaned (no worker will complete them).
+// This moves them to 'retry' (if retries remain) or 'failed'. The 10-second window avoids
+// touching jobs that were legitimately just picked up by another worker before the restart.
 const cleanOrphanedJobs = async (opts: { connectionString: string; schema: string }) => {
   const pool = new Pool({ connectionString: opts.connectionString });
   try {
@@ -27,6 +30,8 @@ const cleanOrphanedJobs = async (opts: { connectionString: string; schema: strin
   }
 };
 
+// Only expireInSeconds, retryLimit, and retryDelay are persisted to the queue (DB-level settings).
+// batchSize, localConcurrency, and onFailed are worker-side options, applied in registerWorkers.
 const ensureQueues = async (opts: { boss: PgBoss; queues: Record<string, QueueConfig> }) => {
   for (const [name, config] of Object.entries(opts.queues)) {
     const existing = await opts.boss.getQueue(name);
@@ -66,6 +71,7 @@ const registerWorkers = async (opts: {
     if (config.localConcurrency !== undefined) workOpts.localConcurrency = config.localConcurrency;
 
     await opts.boss.work(name, workOpts, async (jobs) => {
+      // Single-job path: re-throw so pg-boss handles retry/fail state automatically.
       if (batchSize === 1) {
         const job = jobs[0]!;
         try {
@@ -77,6 +83,8 @@ const registerWorkers = async (opts: {
           throw err;
         }
       } else {
+        // Batch path: pg-boss gives us the whole batch in one callback, so we must
+        // explicitly fail individual jobs — re-throwing would fail the entire batch.
         const results = await Promise.allSettled(jobs.map((job) => handler(job.data)));
         const failed = results
           .map((r, i) => (r.status === "rejected" ? { job: jobs[i]!, reason: r.reason } : null))
@@ -118,6 +126,7 @@ const createInitJobs = (opts: {
   cleanOrphans: boolean;
   getBoss: () => Promise<PgBoss>;
 }) => {
+  // Guard against double-initialization (e.g. HMR in dev or multiple hook calls).
   let initialized = false;
 
   const initJobs = async (handlers: Record<string, (data: unknown) => Promise<void>>) => {
