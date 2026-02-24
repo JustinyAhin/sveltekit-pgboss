@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import type { AnyJob, CreateDashboardOpts, DashboardData, JobInfo, QueueStats } from "./types.js";
+import type { CreateDashboardOpts, DashboardData, JobInfo, QueueStats } from "./types.js";
 
 const createDashboard = (opts: CreateDashboardOpts) => {
   let pool: Pool | null = null;
@@ -28,26 +28,26 @@ const createDashboard = (opts: CreateDashboardOpts) => {
   };
 
   const getRecentJobs = async (limit = 50): Promise<JobInfo[]> => {
-    const boss = await opts.getBoss();
-
-    const jobsByQueue = await Promise.all(opts.queueNames.map((name) => boss.findJobs(name)));
-
-    return (jobsByQueue.flat() as AnyJob[])
-      .sort((a, b) => new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime())
-      .slice(0, limit)
-      .map((j) => ({
-        id: j.id,
-        name: j.name,
-        state: j.state,
-        data: j.data as Record<string, unknown>,
-        createdOn: j.createdOn,
-        startedOn: j.startedOn,
-        completedOn: j.completedOn,
-        retryCount: j.retryCount,
-        retryLimit: j.retryLimit,
-        singletonKey: j.singletonKey,
-        output: j.output,
-      }));
+    const result = await getPool().query<JobInfo>(
+      `
+				SELECT
+					id, name, state,
+					data,
+					created_on AS "createdOn",
+					started_on AS "startedOn",
+					completed_on AS "completedOn",
+					retry_count AS "retryCount",
+					retry_limit AS "retryLimit",
+					singleton_key AS "singletonKey",
+					output
+				FROM ${opts.schema}.job
+				WHERE name = ANY($1)
+				ORDER BY created_on DESC
+				LIMIT $2
+				`,
+      [opts.queueNames, limit],
+    );
+    return result.rows;
   };
 
   const getData = async (limit = 50): Promise<DashboardData> => {
