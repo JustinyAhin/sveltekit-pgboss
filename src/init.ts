@@ -64,7 +64,16 @@ const registerWorkers = async (opts: {
       if (batchSize === 1) {
         await handler(jobs[0]!.data);
       } else {
-        await Promise.all(jobs.map((job) => handler(job.data)));
+        const results = await Promise.allSettled(jobs.map((job) => handler(job.data)));
+        const failed = results
+          .map((r, i) => (r.status === "rejected" ? jobs[i]! : null))
+          .filter((j) => j !== null);
+        if (failed.length > 0) {
+          await opts.boss.fail(
+            name,
+            failed.map((j) => j.id),
+          );
+        }
       }
     });
   }
