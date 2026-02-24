@@ -2,11 +2,15 @@ import { Pool } from "pg";
 import type { AnyJob, CreateDashboardOpts, DashboardData, JobInfo, QueueStats } from "./types.js";
 
 const createDashboard = (opts: CreateDashboardOpts) => {
+  let pool: Pool | null = null;
+  const getPool = () => {
+    if (!pool) pool = new Pool({ connectionString: opts.connectionString });
+    return pool;
+  };
+
   const getStats = async (): Promise<QueueStats[]> => {
-    const pool = new Pool({ connectionString: opts.connectionString });
-    try {
-      const result = await pool.query<QueueStats>(
-        `
+    const result = await getPool().query<QueueStats>(
+      `
 				SELECT
 					q.name,
 					coalesce((count(*) FILTER (WHERE j.state < 'active' AND j.start_after <= now()))::int, 0) AS "queuedCount",
@@ -18,12 +22,9 @@ const createDashboard = (opts: CreateDashboardOpts) => {
 				GROUP BY q.name
 				ORDER BY q.name
 				`,
-        [opts.queueNames],
-      );
-      return result.rows;
-    } finally {
-      await pool.end();
-    }
+      [opts.queueNames],
+    );
+    return result.rows;
   };
 
   const getRecentJobs = async (limit = 50): Promise<JobInfo[]> => {
