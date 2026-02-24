@@ -5,6 +5,8 @@ type BossState = {
   starting: Promise<PgBoss> | null;
 };
 
+let signalHandlersRegistered = false;
+
 const createBossManager = (opts: {
   connectionString: string;
   schema: string;
@@ -42,8 +44,11 @@ const createBossManager = (opts: {
     }
   };
 
-  process.on("SIGINT", stopBoss);
-  process.on("SIGTERM", stopBoss);
+  if (!signalHandlersRegistered) {
+    process.on("SIGINT", stopBoss);
+    process.on("SIGTERM", stopBoss);
+    signalHandlersRegistered = true;
+  }
 
   return { getBoss, stopBoss };
 };
