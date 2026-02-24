@@ -59,8 +59,13 @@ const registerWorkers = async (opts: {
     }
 
     const batchSize = config.batchSize ?? 1;
+    const workOpts: { batchSize: number; includeMetadata: true; localConcurrency?: number } = {
+      batchSize,
+      includeMetadata: true,
+    };
+    if (config.localConcurrency !== undefined) workOpts.localConcurrency = config.localConcurrency;
 
-    await opts.boss.work(name, { batchSize, includeMetadata: true }, async (jobs) => {
+    await opts.boss.work(name, workOpts, async (jobs) => {
       if (batchSize === 1) {
         const job = jobs[0]!;
         try {

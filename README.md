@@ -83,6 +83,7 @@ queue<{ to: string }>()
 | `expireInSeconds` | `number` | pg-boss default | Job expiration |
 | `retryLimit` | `number` | pg-boss default | Max retries |
 | `retryDelay` | `number` | pg-boss default | Delay between retries (seconds) |
+| `localConcurrency` | `number` | pg-boss default | Max concurrent jobs per worker |
 | `onFailed` | `(opts: { data: T; error: unknown }) => Promise<void>` | — | Called when a job exhausts all retries |
 
 #### Returned Object

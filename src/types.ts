@@ -7,6 +7,7 @@ type QueueConfig<T = unknown> = {
   expireInSeconds?: number;
   retryLimit?: number;
   retryDelay?: number;
+  localConcurrency?: number;
   onFailed?: (opts: { data: T; error: unknown }) => Promise<void>;
 };
 
