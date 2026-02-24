@@ -60,18 +60,33 @@ const registerWorkers = async (opts: {
 
     const batchSize = config.batchSize ?? 1;
 
-    await opts.boss.work(name, { batchSize }, async (jobs) => {
+    await opts.boss.work(name, { batchSize, includeMetadata: true }, async (jobs) => {
       if (batchSize === 1) {
-        await handler(jobs[0]!.data);
+        const job = jobs[0]!;
+        try {
+          await handler(job.data);
+        } catch (err) {
+          if (config.onFailed && job.retryCount >= job.retryLimit) {
+            await config.onFailed(job.data, err);
+          }
+          throw err;
+        }
       } else {
         const results = await Promise.allSettled(jobs.map((job) => handler(job.data)));
         const failed = results
-          .map((r, i) => (r.status === "rejected" ? jobs[i]! : null))
-          .filter((j) => j !== null);
+          .map((r, i) => (r.status === "rejected" ? { job: jobs[i]!, reason: r.reason } : null))
+          .filter((f) => f !== null);
         if (failed.length > 0) {
+          if (config.onFailed) {
+            await Promise.all(
+              failed
+                .filter((f) => f.job.retryCount >= f.job.retryLimit)
+                .map((f) => config.onFailed!(f.job.data, f.reason)),
+            );
+          }
           await opts.boss.fail(
             name,
-            failed.map((j) => j.id),
+            failed.map((f) => f.job.id),
           );
         }
       }
