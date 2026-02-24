@@ -17,3 +17,8 @@
 
 - Add optional `onFailed` callback to `QueueConfig` for jobs that exhaust all retries (#6)
 - Expose `localConcurrency` in `QueueConfig`
+
+### Testing
+
+- Add unit test suite with vitest (8 tests covering worker registration, batch/retry logic, orphan cleanup, idempotency)
+- Add type-level tests for phantom types, `PayloadMap`, `HandlersMap`, and `send()` type safety

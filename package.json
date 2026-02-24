@@ -24,6 +24,8 @@
         "format:check": "oxfmt --check src/ tsup.config.ts",
         "typecheck": "tsc --noEmit",
         "check": "oxlint src/ && tsc --noEmit && oxfmt --check src/",
+        "test": "vitest run",
+        "test:types": "vitest --typecheck.only run",
         "prepublishOnly": "bun run build"
     },
     "publishConfig": {
@@ -43,6 +45,7 @@
         "oxfmt": "^0.34.0",
         "oxlint": "^1.49.0",
         "tsup": "^8.5.1",
-        "typescript": "^5.9.3"
+        "typescript": "^5.9.3",
+        "vitest": "^4.0.18"
     }
 }
