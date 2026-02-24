@@ -16,3 +16,4 @@
 ### Features
 
 - Add optional `onFailed` callback to `QueueConfig` for jobs that exhaust all retries (#6)
+- Expose `localConcurrency` in `QueueConfig`
