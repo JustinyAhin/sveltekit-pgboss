@@ -4,6 +4,14 @@ import { createInitJobs } from "./init.js";
 import { createDashboard } from "./dashboard.js";
 import type { Dashboard, HandlersMap, JobSystemConfig, PayloadMap, QueueConfig } from "./types.js";
 
+const validateSchema = (schema: string): string => {
+  const schemaPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  if (!schemaPattern.test(schema)) {
+    throw new Error(`Invalid schema "${schema}". Schema must match /^[A-Za-z_][A-Za-z0-9_]*$/.`);
+  }
+  return schema;
+};
+
 /**
  * Define a typed queue. The generic parameter `T` sets the payload type
  * enforced by `send()` and handler signatures.
@@ -38,10 +46,10 @@ const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
 } => {
   type Payloads = PayloadMap<Q>;
 
-  const schema = config.schema ?? "pgboss";
+  const schema = validateSchema(config.schema ?? "pgboss");
   const onError = config.onError ?? ((err: Error) => console.error("[pg-boss] error:", err));
 
-  const { getBoss, stopBoss } = createBossManager({
+  const { getBoss, stopBoss: stopBossManager } = createBossManager({
     connectionString: config.connectionString,
     schema,
     onError,
@@ -54,6 +62,7 @@ const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
     schedules: config.schedules,
     cleanOrphans: config.cleanOrphans ?? true,
     getBoss,
+    onError,
   });
 
   /** Register worker handlers for all queues. Call once at server startup (idempotent). */
@@ -70,6 +79,15 @@ const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
     queueNames,
     getBoss,
   });
+
+  const stopBoss = async (): Promise<void> => {
+    const [stopResult, dashboardResult] = await Promise.allSettled([
+      stopBossManager(),
+      dashboard.close(),
+    ]);
+    if (stopResult.status === "rejected") throw stopResult.reason;
+    if (dashboardResult.status === "rejected") throw dashboardResult.reason;
+  };
 
   /** Enqueue a job. The payload type is inferred from the queue definition. */
   const send = async <K extends keyof Payloads & string>(opts: {

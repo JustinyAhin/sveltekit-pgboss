@@ -78,6 +78,7 @@ type Dashboard = {
   }) => Promise<{ jobs: JobInfo[]; pagination: PaginationInfo }>;
   getData: (opts?: { page?: number; perPage?: number }) => Promise<DashboardData>;
   rerunJob: (opts: { queue: string; jobId: string }) => Promise<{ queued: boolean }>;
+  close: () => Promise<void>;
 };
 
 type AnyJob = JobWithMetadata<Record<string, unknown>>;

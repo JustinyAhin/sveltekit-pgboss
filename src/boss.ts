@@ -9,6 +9,20 @@ type BossState = {
 // Module-level flag so signal handlers are registered at most once,
 // even if createBossManager is called multiple times in a process.
 let signalHandlersRegistered = false;
+const stopCallbacks = new Set<() => Promise<void>>();
+
+const registerSignalHandlers = () => {
+  if (signalHandlersRegistered) return;
+
+  const handleSignal = () => {
+    const callbacks = Array.from(stopCallbacks);
+    void Promise.allSettled(callbacks.map((stop) => stop()));
+  };
+
+  process.on("SIGINT", handleSignal);
+  process.on("SIGTERM", handleSignal);
+  signalHandlersRegistered = true;
+};
 
 const createBossManager = (opts: {
   connectionString: string;
@@ -28,30 +42,39 @@ const createBossManager = (opts: {
       });
 
       instance.on("error", opts.onError);
-      await instance.start();
-      console.log("[pg-boss] started");
-
-      state.instance = instance;
-      return instance;
+      try {
+        await instance.start();
+        console.log("[pg-boss] started");
+        state.instance = instance;
+        return instance;
+      } catch (error) {
+        state.starting = null;
+        throw error;
+      }
     })();
 
     return state.starting;
   };
 
   const stopBoss = async () => {
+    if (!state.instance && state.starting) {
+      try {
+        await state.starting;
+      } catch {
+        return;
+      }
+    }
+
     if (state.instance) {
       await state.instance.stop({ graceful: true });
       console.log("[pg-boss] stopped");
       state.instance = null;
-      state.starting = null;
     }
+    state.starting = null;
   };
 
-  if (!signalHandlersRegistered) {
-    process.on("SIGINT", stopBoss);
-    process.on("SIGTERM", stopBoss);
-    signalHandlersRegistered = true;
-  }
+  registerSignalHandlers();
+  stopCallbacks.add(stopBoss);
 
   return { getBoss, stopBoss };
 };

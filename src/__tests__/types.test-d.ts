@@ -40,5 +40,6 @@ describe("type-level tests", () => {
     });
 
     expectTypeOf(system.send).parameter(0).toHaveProperty("data");
+    expectTypeOf(system.dashboard.close).toEqualTypeOf<() => Promise<void>>();
   });
 });

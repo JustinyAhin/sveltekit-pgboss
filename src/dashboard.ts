@@ -7,6 +7,12 @@ import type {
   QueueStats,
 } from "./types.js";
 
+const normalizePositiveInt = (opts: { value: number; fallback: number }): number => {
+  if (!Number.isFinite(opts.value)) return opts.fallback;
+  const normalized = Math.trunc(opts.value);
+  return normalized > 0 ? normalized : opts.fallback;
+};
+
 // Raw SQL is used instead of pg-boss APIs because pg-boss has no aggregation/stats queries.
 const createDashboard = (opts: CreateDashboardOpts) => {
   // Lazy singleton pool — reused across all dashboard calls to avoid per-request connection overhead.
@@ -40,7 +46,9 @@ const createDashboard = (opts: CreateDashboardOpts) => {
     jobs: JobInfo[];
     pagination: PaginationInfo;
   }> => {
-    const offset = (page - 1) * perPage;
+    const normalizedPage = normalizePositiveInt({ value: page, fallback: 1 });
+    const normalizedPerPage = normalizePositiveInt({ value: perPage, fallback: 50 });
+    const offset = (normalizedPage - 1) * normalizedPerPage;
     const [jobsResult, countResult] = await Promise.all([
       getPool().query<JobInfo>(
         `
@@ -59,7 +67,7 @@ const createDashboard = (opts: CreateDashboardOpts) => {
 				ORDER BY created_on DESC
 				LIMIT $2 OFFSET $3
 				`,
-        [opts.queueNames, perPage, offset],
+        [opts.queueNames, normalizedPerPage, offset],
       ),
       getPool().query<{ count: number }>(
         `SELECT count(*)::int AS count FROM ${opts.schema}.job WHERE name = ANY($1)`,
@@ -69,7 +77,12 @@ const createDashboard = (opts: CreateDashboardOpts) => {
     const totalCount = countResult.rows[0]?.count ?? 0;
     return {
       jobs: jobsResult.rows,
-      pagination: { page, totalPages: Math.ceil(totalCount / perPage), totalCount, perPage },
+      pagination: {
+        page: normalizedPage,
+        totalPages: Math.ceil(totalCount / normalizedPerPage),
+        totalCount,
+        perPage: normalizedPerPage,
+      },
     };
   };
 
@@ -90,7 +103,14 @@ const createDashboard = (opts: CreateDashboardOpts) => {
     return { queued: true };
   };
 
-  return { getStats, getRecentJobs, getData, rerunJob };
+  const close = async (): Promise<void> => {
+    if (!pool) return;
+    const currentPool = pool;
+    pool = null;
+    await currentPool.end();
+  };
+
+  return { getStats, getRecentJobs, getData, rerunJob, close };
 };
 
 export { createDashboard };

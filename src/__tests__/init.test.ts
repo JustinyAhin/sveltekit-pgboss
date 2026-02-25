@@ -51,7 +51,7 @@ describe("createInitJobs", () => {
 
   const setup = (
     queues: Record<string, any>,
-    opts?: { cleanOrphans?: boolean; schedules?: any[] },
+    opts?: { cleanOrphans?: boolean; schedules?: any[]; onError?: (err: Error) => void },
   ) =>
     createInitJobs({
       connectionString: "postgres://localhost/test",
@@ -60,6 +60,7 @@ describe("createInitJobs", () => {
       cleanOrphans: opts?.cleanOrphans ?? false,
       schedules: opts?.schedules,
       getBoss: async () => boss as unknown as PgBoss,
+      onError: opts?.onError,
     });
 
   // --- Single-job path ---
@@ -189,5 +190,46 @@ describe("createInitJobs", () => {
     await initJobs({ myqueue: handler });
 
     expect((boss as any).work).toHaveBeenCalledTimes(1);
+  });
+
+  it("can retry initialization after a previous failure", async () => {
+    const handler = vi.fn().mockResolvedValue(undefined);
+    let firstAttempt = true;
+
+    const initJobs = createInitJobs({
+      connectionString: "postgres://localhost/test",
+      schema: "pgboss",
+      queues: { myqueue: {} },
+      cleanOrphans: false,
+      getBoss: async () => {
+        if (firstAttempt) {
+          firstAttempt = false;
+          throw new Error("db unavailable");
+        }
+        return boss as unknown as PgBoss;
+      },
+    });
+
+    await expect(initJobs({ myqueue: handler })).rejects.toThrow("db unavailable");
+    await expect(initJobs({ myqueue: handler })).resolves.toBeUndefined();
+    expect((boss as any).work).toHaveBeenCalledTimes(1);
+  });
+
+  it("still fails jobs in batch mode when onFailed hook throws", async () => {
+    const onError = vi.fn();
+    const onFailed = vi.fn().mockRejectedValue(new Error("hook failed"));
+    const handler = vi.fn().mockRejectedValue(new Error("job failed"));
+    const initJobs = setup({ myqueue: { batchSize: 2, onFailed } }, { onError });
+    await initJobs({ myqueue: handler });
+
+    const cb = boss.workCallbacks.get("myqueue")!;
+    const jobs = [
+      makeJob({ id: "j1", retryCount: 3, retryLimit: 3, data: { a: 1 } }),
+      makeJob({ id: "j2", retryCount: 3, retryLimit: 3, data: { b: 2 } }),
+    ];
+
+    await expect(cb(jobs)).resolves.toBeUndefined();
+    expect((boss as any).fail).toHaveBeenCalledWith("myqueue", ["j1", "j2"]);
+    expect(onError).toHaveBeenCalledTimes(2);
   });
 });

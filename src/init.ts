@@ -2,6 +2,11 @@ import type { PgBoss } from "pg-boss";
 import { Pool } from "pg";
 import type { JobSystemConfig, QueueConfig } from "./types.js";
 
+const normalizeError = (error: unknown): Error => {
+  if (error instanceof Error) return error;
+  return new Error(String(error));
+};
+
 // On server restart, jobs left in 'active' state are orphaned (no worker will complete them).
 // This moves them to 'retry' (if retries remain) or 'failed'. The 10-second window avoids
 // touching jobs that were legitimately just picked up by another worker before the restart.
@@ -55,6 +60,7 @@ const registerWorkers = async (opts: {
   boss: PgBoss;
   queues: Record<string, QueueConfig>;
   handlers: Record<string, (data: unknown) => Promise<unknown>>;
+  onError?: (err: Error) => void;
 }) => {
   for (const [name, config] of Object.entries(opts.queues)) {
     const handler = opts.handlers[name];
@@ -76,30 +82,47 @@ const registerWorkers = async (opts: {
         const job = jobs[0]!;
         try {
           await handler(job.data);
-        } catch (err) {
+        } catch (error) {
           if (config.onFailed && job.retryCount >= job.retryLimit) {
-            await config.onFailed({ data: job.data, error: err });
+            await config.onFailed({ data: job.data, error });
           }
-          throw err;
+          throw error;
         }
       } else {
         // Batch path: pg-boss gives us the whole batch in one callback, so we must
         // explicitly fail individual jobs — re-throwing would fail the entire batch.
         const results = await Promise.allSettled(jobs.map((job) => handler(job.data)));
         const failed = results
-          .map((r, i) => (r.status === "rejected" ? { job: jobs[i]!, reason: r.reason } : null))
-          .filter((f) => f !== null);
+          .map((result, index) =>
+            result.status === "rejected" ? { job: jobs[index]!, reason: result.reason } : null,
+          )
+          .filter((entry) => entry !== null);
+
         if (failed.length > 0) {
           if (config.onFailed) {
-            await Promise.all(
-              failed
-                .filter((f) => f.job.retryCount >= f.job.retryLimit)
-                .map((f) => config.onFailed!({ data: f.job.data, error: f.reason })),
+            const exhausted = failed.filter(
+              (entry) => entry.job.retryCount >= entry.job.retryLimit,
             );
+            const onFailedResults = await Promise.allSettled(
+              exhausted.map((entry) =>
+                config.onFailed!({ data: entry.job.data, error: entry.reason }),
+              ),
+            );
+            onFailedResults.forEach((result, index) => {
+              if (result.status === "rejected") {
+                const jobId = exhausted[index]?.job.id ?? "unknown";
+                const hookError = normalizeError(result.reason);
+                opts.onError?.(
+                  new Error(
+                    `[pg-boss] onFailed hook failed for queue "${name}" and job "${jobId}": ${hookError.message}`,
+                  ),
+                );
+              }
+            });
           }
           await opts.boss.fail(
             name,
-            failed.map((f) => f.job.id),
+            failed.map((entry) => entry.job.id),
           );
         }
       }
@@ -125,28 +148,42 @@ const createInitJobs = (opts: {
   schedules?: JobSystemConfig["schedules"];
   cleanOrphans: boolean;
   getBoss: () => Promise<PgBoss>;
+  onError?: (err: Error) => void;
 }) => {
   // Guard against double-initialization (e.g. HMR in dev or multiple hook calls).
   let initialized = false;
+  let initializing: Promise<void> | null = null;
 
   const initJobs = async (handlers: Record<string, (data: unknown) => Promise<unknown>>) => {
     if (initialized) return;
-    initialized = true;
-
-    const boss = await opts.getBoss();
-
-    if (opts.cleanOrphans) {
-      await cleanOrphanedJobs({
-        connectionString: opts.connectionString,
-        schema: opts.schema,
-      });
+    if (initializing) {
+      await initializing;
+      return;
     }
 
-    await ensureQueues({ boss, queues: opts.queues });
-    await registerWorkers({ boss, queues: opts.queues, handlers });
-    await registerSchedules({ boss, schedules: opts.schedules });
+    initializing = (async () => {
+      const boss = await opts.getBoss();
 
-    console.log("[pg-boss] handlers registered");
+      if (opts.cleanOrphans) {
+        await cleanOrphanedJobs({
+          connectionString: opts.connectionString,
+          schema: opts.schema,
+        });
+      }
+
+      await ensureQueues({ boss, queues: opts.queues });
+      await registerWorkers({ boss, queues: opts.queues, handlers, onError: opts.onError });
+      await registerSchedules({ boss, schedules: opts.schedules });
+
+      initialized = true;
+      console.log("[pg-boss] handlers registered");
+    })();
+
+    try {
+      await initializing;
+    } finally {
+      initializing = null;
+    }
   };
 
   return initJobs;

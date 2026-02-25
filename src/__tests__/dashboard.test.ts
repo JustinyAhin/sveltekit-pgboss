@@ -3,10 +3,12 @@ import type { PgBoss } from "pg-boss";
 import { createDashboard } from "../dashboard.js";
 
 const mockQuery = vi.fn();
+const mockEnd = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("pg", () => {
   class MockPool {
     query = mockQuery;
+    end = mockEnd;
   }
   return { Pool: MockPool };
 });
@@ -91,6 +93,23 @@ describe("createDashboard", () => {
         perPage: 50,
       });
     });
+
+    it("normalizes invalid pagination values", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: 20 }] });
+
+      const dashboard = setup();
+      const result = await dashboard.getRecentJobs({ page: 0, perPage: 0 });
+
+      const jobsCall = mockQuery.mock.calls[0]!;
+      expect(jobsCall[1]).toEqual([["email", "reports"], 50, 0]);
+      expect(result.pagination).toEqual({
+        page: 1,
+        totalPages: 1,
+        totalCount: 20,
+        perPage: 50,
+      });
+    });
   });
 
   describe("getData", () => {
@@ -130,6 +149,23 @@ describe("createDashboard", () => {
 
       expect(result.pagination.perPage).toBe(50);
       expect(result.pagination.page).toBe(1);
+    });
+  });
+
+  describe("close", () => {
+    it("is idempotent and closes the pool once", async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: 0 }] });
+
+      const dashboard = setup();
+      await dashboard.close();
+      expect(mockEnd).not.toHaveBeenCalled();
+
+      await dashboard.getRecentJobs();
+      await dashboard.close();
+      await dashboard.close();
+
+      expect(mockEnd).toHaveBeenCalledTimes(1);
     });
   });
 });
