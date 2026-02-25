@@ -59,6 +59,10 @@ bunx oxfmt src/path/to/file.ts
 bun run typecheck
 ```
 
+3. **Docs sync (when needed)**:
+
+- If you changed public API, behavior, config, or examples, update `README.md` in the same change.
+
 ## Testing Changes
 
 No test suite yet. Test by linking into a consumer project:

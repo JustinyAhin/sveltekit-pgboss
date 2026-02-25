@@ -57,7 +57,7 @@ Returns `{ send, getBoss, stopBoss, initJobs, dashboard }`.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `connectionString` | `string` | *required* | PostgreSQL connection string |
-| `schema` | `string` | `'pgboss'` | pg-boss schema name |
+| `schema` | `string` | `'pgboss'` | pg-boss schema name (must match `^[A-Za-z_][A-Za-z0-9_]*$`) |
 | `queues` | `Record<string, QueueConfig<T>>` | *required* | Queue definitions created with `queue<T>()` |
 | `schedules` | `ScheduleConfig[]` | `[]` | Cron schedules |
 | `cleanOrphans` | `boolean` | `true` | Fail orphaned active jobs on startup |
@@ -92,12 +92,13 @@ queue<{ to: string }>()
 |---|---|---|
 | `send` | `(opts: { name, data, options? }) => Promise<string \| null>` | Type-safe job sender — queue name and payload are validated at compile time |
 | `getBoss` | `() => Promise<PgBoss>` | Get the raw pg-boss instance (starts it on first call) |
-| `stopBoss` | `() => Promise<void>` | Graceful shutdown |
+| `stopBoss` | `() => Promise<void>` | Graceful shutdown (stops pg-boss and closes dashboard DB pool) |
 | `initJobs` | `(handlers) => Promise<void>` | Initialize: clean orphans, create queues, register workers & schedules. Handlers are required for every queue. |
 | `dashboard.getData({ page?, perPage? })` | `() => Promise<DashboardData>` | Queue stats + paginated jobs (default: page 1, 50 per page) |
 | `dashboard.rerunJob({ queue, jobId })` | `() => Promise<{ queued: true }>` | Re-queue a job by ID |
 | `dashboard.getStats()` | `() => Promise<QueueStats[]>` | Queue stats only |
 | `dashboard.getRecentJobs({ page?, perPage? })` | `() => Promise<{ jobs: JobInfo[], pagination: PaginationInfo }>` | Paginated jobs (default: page 1, 50 per page) |
+| `dashboard.close()` | `() => Promise<void>` | Closes the dashboard Postgres pool (safe to call multiple times) |
 
 ## Usage with SvelteKit
 
