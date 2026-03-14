@@ -82,3 +82,11 @@ Published to npm under `@segbedji/sveltekit-pgboss`.
 ```bash
 bun run build && npm publish
 ```
+
+## Fetching Pages
+
+When you need to fetch a page's content, use this order:
+
+1. `curl https://defuddle.md/[url]` — preferred, returns clean markdown
+2. `bunx playbooks get [url]` — fallback if defuddle fails or result is poor
+3. WebFetch tool — last resort

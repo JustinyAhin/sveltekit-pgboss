@@ -5,11 +5,13 @@ import { createDashboard } from "./dashboard.js";
 import type { Dashboard, HandlersMap, JobSystemConfig, PayloadMap, QueueConfig } from "./types.js";
 
 const validateSchema = (schema: string): string => {
-  const schemaPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
-  if (!schemaPattern.test(schema)) {
-    throw new Error(`Invalid schema "${schema}". Schema must match /^[A-Za-z_][A-Za-z0-9_]*$/.`);
-  }
-  return schema;
+    const schemaPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    if (!schemaPattern.test(schema)) {
+        throw new Error(
+            `Invalid schema "${schema}". Schema must match /^[A-Za-z_][A-Za-z0-9_]*$/.`,
+        );
+    }
+    return schema;
 };
 
 /**
@@ -23,7 +25,7 @@ const validateSchema = (schema: string): string => {
  */
 // The Omit hides __payload from the public API; the cast preserves T for type inference downstream.
 const queue = <T>(config?: Omit<QueueConfig<T>, "__payload">): QueueConfig<T> => {
-  return (config ?? {}) as QueueConfig<T>;
+    return (config ?? {}) as QueueConfig<T>;
 };
 
 /**
@@ -32,86 +34,86 @@ const queue = <T>(config?: Omit<QueueConfig<T>, "__payload">): QueueConfig<T> =>
  * and `dashboard` for queue stats / job inspection.
  */
 const createJobSystem = <Q extends Record<string, QueueConfig<any>>>(
-  config: JobSystemConfig<Q>,
+    config: JobSystemConfig<Q>,
 ): {
-  getBoss: () => Promise<PgBoss>;
-  stopBoss: () => Promise<void>;
-  initJobs: (handlers: HandlersMap<Q>) => Promise<void>;
-  dashboard: Dashboard;
-  send: <K extends keyof PayloadMap<Q> & string>(opts: {
-    name: K;
-    data: PayloadMap<Q>[K];
-    options?: SendOptions;
-  }) => Promise<string | null>;
+    getBoss: () => Promise<PgBoss>;
+    stopBoss: () => Promise<void>;
+    initJobs: (handlers: HandlersMap<Q>) => Promise<void>;
+    dashboard: Dashboard;
+    send: <K extends keyof PayloadMap<Q> & string>(opts: {
+        name: K;
+        data: PayloadMap<Q>[K];
+        options?: SendOptions;
+    }) => Promise<string | null>;
 } => {
-  type Payloads = PayloadMap<Q>;
+    type Payloads = PayloadMap<Q>;
 
-  const schema = validateSchema(config.schema ?? "pgboss");
-  const onError = config.onError ?? ((err: Error) => console.error("[pg-boss] error:", err));
+    const schema = validateSchema(config.schema ?? "pgboss");
+    const onError = config.onError ?? ((err: Error) => console.error("[pg-boss] error:", err));
 
-  const { getBoss, stopBoss: stopBossManager } = createBossManager({
-    connectionString: config.connectionString,
-    schema,
-    onError,
-  });
+    const { getBoss, stopBoss: stopBossManager } = createBossManager({
+        connectionString: config.connectionString,
+        schema,
+        onError,
+    });
 
-  const _initJobs = createInitJobs({
-    connectionString: config.connectionString,
-    schema,
-    queues: config.queues as Record<string, QueueConfig>,
-    schedules: config.schedules,
-    cleanOrphans: config.cleanOrphans ?? true,
-    getBoss,
-    onError,
-  });
+    const _initJobs = createInitJobs({
+        connectionString: config.connectionString,
+        schema,
+        queues: config.queues as Record<string, QueueConfig>,
+        schedules: config.schedules,
+        cleanOrphans: config.cleanOrphans ?? true,
+        getBoss,
+        onError,
+    });
 
-  /** Register worker handlers for all queues. Call once at server startup (idempotent). */
-  // Cast erases the per-queue payload types so init.ts can work with a uniform signature.
-  // Type safety is enforced at the call site via HandlersMap<Q>.
-  const initJobs = (handlers: HandlersMap<Q>) =>
-    _initJobs(handlers as Record<string, (data: unknown) => Promise<unknown>>);
+    /** Register worker handlers for all queues. Call once at server startup (idempotent). */
+    // Cast erases the per-queue payload types so init.ts can work with a uniform signature.
+    // Type safety is enforced at the call site via HandlersMap<Q>.
+    const initJobs = (handlers: HandlersMap<Q>) =>
+        _initJobs(handlers as Record<string, (data: unknown) => Promise<unknown>>);
 
-  const queueNames = Object.keys(config.queues);
+    const queueNames = Object.keys(config.queues);
 
-  const dashboard = createDashboard({
-    connectionString: config.connectionString,
-    schema,
-    queueNames,
-    getBoss,
-  });
+    const dashboard = createDashboard({
+        connectionString: config.connectionString,
+        schema,
+        queueNames,
+        getBoss,
+    });
 
-  const stopBoss = async (): Promise<void> => {
-    const [stopResult, dashboardResult] = await Promise.allSettled([
-      stopBossManager(),
-      dashboard.close(),
-    ]);
-    if (stopResult.status === "rejected") throw stopResult.reason;
-    if (dashboardResult.status === "rejected") throw dashboardResult.reason;
-  };
+    const stopBoss = async (): Promise<void> => {
+        const [stopResult, dashboardResult] = await Promise.allSettled([
+            stopBossManager(),
+            dashboard.close(),
+        ]);
+        if (stopResult.status === "rejected") throw stopResult.reason;
+        if (dashboardResult.status === "rejected") throw dashboardResult.reason;
+    };
 
-  /** Enqueue a job. The payload type is inferred from the queue definition. */
-  const send = async <K extends keyof Payloads & string>(opts: {
-    name: K;
-    data: Payloads[K];
-    options?: SendOptions;
-  }): Promise<string | null> => {
-    const boss = await getBoss();
-    return boss.send(opts.name, opts.data as object, opts.options);
-  };
+    /** Enqueue a job. The payload type is inferred from the queue definition. */
+    const send = async <K extends keyof Payloads & string>(opts: {
+        name: K;
+        data: Payloads[K];
+        options?: SendOptions;
+    }): Promise<string | null> => {
+        const boss = await getBoss();
+        return boss.send(opts.name, opts.data as object, opts.options);
+    };
 
-  return { getBoss, stopBoss, initJobs, dashboard, send };
+    return { getBoss, stopBoss, initJobs, dashboard, send };
 };
 
 export { createJobSystem, queue };
 export type {
-  JobSystemConfig,
-  PayloadMap,
-  HandlersMap,
-  QueueConfig,
-  ScheduleConfig,
-  QueueStats,
-  JobInfo,
-  PaginationInfo,
-  DashboardData,
-  Dashboard,
+    JobSystemConfig,
+    PayloadMap,
+    HandlersMap,
+    QueueConfig,
+    ScheduleConfig,
+    QueueStats,
+    JobInfo,
+    PaginationInfo,
+    DashboardData,
+    Dashboard,
 } from "./types.js";
