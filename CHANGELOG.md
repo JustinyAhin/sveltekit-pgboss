@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.10-beta.0
+
+### Features
+
+- Add `dashboard.getJobById({ jobId })` — returns `JobInfo | null` for a single job, enabling status polling using the ID returned from `send()`
+
+### Bug Fixes
+
+- Harden boss/init lifecycle and dashboard reliability
+
 ## 0.0.9-beta.0
 
 ### Breaking Changes

@@ -1,6 +1,6 @@
 {
     "name": "@segbedji/sveltekit-pgboss",
-    "version": "0.0.9-beta.0",
+    "version": "0.0.10-beta.0",
     "exports": "./src/index.ts",
     "publish": {
         "include": ["src/**/*.ts", "README.md", "LICENSE"],

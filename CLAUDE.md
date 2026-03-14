@@ -75,12 +75,44 @@ bun link
 bun link @segbedji/sveltekit-pgboss
 ```
 
-## Publishing
+## Releasing
 
-Published to npm under `@segbedji/sveltekit-pgboss`.
+Published to npm (`@segbedji/sveltekit-pgboss`) and JSR (`@segbedji/sveltekit-pgboss`).
+
+### Steps
+
+1. **Bump version** in both `package.json` and `deno.json` (keep them in sync).
+
+2. **Update `CHANGELOG.md`** — add a new section at the top with the version number. Group changes under headings like `### Breaking Changes`, `### Features`, `### Bug Fixes`, `### Performance`, `### Testing`.
+
+3. **Run checks**:
 
 ```bash
-bun run build && npm publish
+bun run check
+```
+
+4. **Commit and push**:
+
+```bash
+git add -A && git commit -m "X.Y.Z-beta.N" && git push
+```
+
+5. **Publish to npm**:
+
+```bash
+# Beta release
+npm publish --tag beta
+
+# Stable release
+npm publish
+```
+
+`prepublishOnly` runs the build automatically.
+
+6. **Publish to JSR**:
+
+```bash
+bunx jsr publish
 ```
 
 ## Fetching Pages
