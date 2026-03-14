@@ -86,6 +86,27 @@ const createDashboard = (opts: CreateDashboardOpts) => {
         };
     };
 
+    const getJobById = async ({ jobId }: { jobId: string }): Promise<JobInfo | null> => {
+        const result = await getPool().query<JobInfo>(
+            `
+				SELECT
+					id, name, state,
+					data,
+					created_on AS "createdOn",
+					started_on AS "startedOn",
+					completed_on AS "completedOn",
+					retry_count AS "retryCount",
+					retry_limit AS "retryLimit",
+					singleton_key AS "singletonKey",
+					output
+				FROM ${opts.schema}.job
+				WHERE id = $1
+				`,
+            [jobId],
+        );
+        return result.rows[0] ?? null;
+    };
+
     const getData = async ({ page = 1, perPage = 50 } = {}): Promise<DashboardData> => {
         const [queues, { jobs, pagination }] = await Promise.all([
             getStats(),
@@ -110,7 +131,7 @@ const createDashboard = (opts: CreateDashboardOpts) => {
         await currentPool.end();
     };
 
-    return { getStats, getRecentJobs, getData, rerunJob, close };
+    return { getStats, getRecentJobs, getData, getJobById, rerunJob, close };
 };
 
 export { createDashboard };

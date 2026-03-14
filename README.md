@@ -95,6 +95,7 @@ queue<{ to: string }>()
 | `stopBoss` | `() => Promise<void>` | Graceful shutdown (stops pg-boss and closes dashboard DB pool) |
 | `initJobs` | `(handlers) => Promise<void>` | Initialize: clean orphans, create queues, register workers & schedules. Handlers are required for every queue. |
 | `dashboard.getData({ page?, perPage? })` | `() => Promise<DashboardData>` | Queue stats + paginated jobs (default: page 1, 50 per page) |
+| `dashboard.getJobById({ jobId })` | `() => Promise<JobInfo \| null>` | Get a single job by ID (useful for polling job status) |
 | `dashboard.rerunJob({ queue, jobId })` | `() => Promise<{ queued: true }>` | Re-queue a job by ID |
 | `dashboard.getStats()` | `() => Promise<QueueStats[]>` | Queue stats only |
 | `dashboard.getRecentJobs({ page?, perPage? })` | `() => Promise<{ jobs: JobInfo[], pagination: PaginationInfo }>` | Paginated jobs (default: page 1, 50 per page) |
@@ -198,6 +199,14 @@ const getJobsDashboard = query(
   }
 );
 
+const getJobStatus = query(
+  z.object({ jobId: z.string() }),
+  async ({ jobId }) => {
+    // Add your own auth check here
+    return dashboard.getJobById({ jobId });
+  }
+);
+
 const rerunJob = command(
   z.object({ queue: z.string(), jobId: z.string() }),
   async ({ queue, jobId }) => {
@@ -206,7 +215,7 @@ const rerunJob = command(
   }
 );
 
-export { getJobsDashboard, rerunJob };
+export { getJobsDashboard, getJobStatus, rerunJob };
 ```
 
 ### Admin page example

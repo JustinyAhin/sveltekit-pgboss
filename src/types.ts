@@ -77,6 +77,7 @@ type Dashboard = {
         perPage?: number;
     }) => Promise<{ jobs: JobInfo[]; pagination: PaginationInfo }>;
     getData: (opts?: { page?: number; perPage?: number }) => Promise<DashboardData>;
+    getJobById: (opts: { jobId: string }) => Promise<JobInfo | null>;
     rerunJob: (opts: { queue: string; jobId: string }) => Promise<{ queued: boolean }>;
     close: () => Promise<void>;
 };
